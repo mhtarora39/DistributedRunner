@@ -52,6 +52,16 @@ The repository allows instances to connect as a standard server-client or with a
    python nodes/client.py --port 8000
    ```
 
+### Option 3: Cyclic Distributed Ring Benchmark
+
+1. **Start the Ring Orchestrator (Windows Terminal)**
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\examples\start_ring_benchmark.ps1
+   ```
+   *This officially instantiates a localized cluster of identical `node.py` modules scaled via `--world-size` and `--rank`. The network dynamically binds downstream continuously whilst processing incoming upstream blocks asynchronously across `threading.Event()` loops to structurally prevent TCP Cycle deadlocks.*
+   
+   *Node 0 inherently evaluates the physical transmission validity (comparing MD5 or raw `np.sum()` checksums of the arrays perfectly tracking payload memory structures uncorrupted). It natively generates Round-Trip Time statistics across `p50`, `p95`, and `p99` latency bands guaranteeing baseline bounds before continuing!*
+
 ## Usage commands
 
 Inside the interactive terminal of the **Client or Server**:

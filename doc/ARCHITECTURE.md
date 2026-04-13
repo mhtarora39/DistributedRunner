@@ -69,3 +69,18 @@ Message metadata (`msg.length`, `msg.type`) is intercepted and logged without ch
 
 ### `--mode isolate` (Interception node)
 Instead of blindly forwarding packets, isolate mode consumes the packet. The `on_message` trigger fires but is entirely siloed, requiring the developer/user to invoke terminal commands (`!c`, `!s`, `!b`) to physically inject new packets into the stream on demand.
+
+## 4. Cyclic Distributed Rings (`node.py`)
+
+A pure Ring Network architecture enables distributed model layer partitioning. The native `node.py` builds directly out of the `runner.py` configuration specifically tuned to cleanly execute closed loops across $N$ elements (`--world-size`). 
+
+### Concurrency and Deadlocking
+In a pure TCP topology, binding sequentially forces a strict cyclic deadlock. If Node 0 initiates an `accept()` waiting for Node $N$ to connect, it will never trigger a `connect()` pushing to Node 1. 
+
+`node.py` sidesteps this flawlessly leveraging `threading.Event()` architectures:
+- Port boundaries are bound locally without blocking.
+- A daemon thread pushes `accept()` instantly triggering an event capture upon incoming neighbor connection lock.
+- The parent thread launches a parallel infinitely recurring `target_socket.connect()` sequence pinging downstream targets natively resolving pipeline connections perfectly in parallel.
+
+### Verification Latency
+Because `core.connection` and `core.message` isolate thread closure sequences natively, payload validation is executed cleanly. The matrix evaluates throughput securely confirming exact bitwise transfers applying NumPy checksum metrics alongside optional `hashlib.md5()` extraction algorithms mapping identically over recursive loops.
