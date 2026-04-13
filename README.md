@@ -14,6 +14,7 @@ DistributedRunner/
 │   └── server.py        # Terminal server script
 ├── doc/
 │   └── ARCHITECTURE.md  # Detailed architectural overview
+├── node.py              # Cyclic Ring topological node
 └── runner.py            # Transparent TCP proxy node
 ```
 
@@ -73,6 +74,12 @@ Inside the interactive terminal of the **Runner**:
 - **`!s <text>`**: Send a string msg explicitly to the Server.
 - **`!b <text>`**: Broadcast a string msg to Both.
 - **`!array`**: Broadcast a multidimensional NumPy array to Both.
+
+**Distributed Ring Node Arguments (`node.py`)**:
+- `--rank` : (Required) Index of the node topological array (0 to world_size - 1).
+- `--world-size` : (Required) Total circumference length of nodes natively forming the ring layout.
+- `--base-port` : (Optional) Base port to bind starting at (default `10000`).
+- `--validate` : (Optional) Enables strict bitwise MD5 payload checksum validation tracking.
 
 ## Architecture
 
