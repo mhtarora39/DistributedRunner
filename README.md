@@ -38,10 +38,14 @@ The repository allows instances to connect as a standard server-client or with a
    ```bash
    python nodes/server.py --port 9000
    ```
-2. **Start the runner (proxy)**
+2. **Start the runner**
    ```bash
-   # Listens for clients on port 8000, proxies packets to port 9000
+   # Listens on 8000, proxies to 9000 (Default: --mode proxy)
    python runner.py --listen-port 8000 --target-port 9000
+
+   # Alternately, you can run in isolated man-in-the-middle mode where 
+   # no packets are automatically forwarded.
+   python runner.py --listen-port 8000 --target-port 9000 --mode isolate
    ```
 3. **Start the client**
    ```bash
@@ -50,9 +54,15 @@ The repository allows instances to connect as a standard server-client or with a
 
 ## Usage commands
 
-Inside the interactive terminal of the Client or Server:
+Inside the interactive terminal of the **Client or Server**:
 - **Type any text**: Sent as a standard UTF-8 string.
-- **Type `!array`**: Sends a multidimensional NumPy array to prove dynamic serialization over the socket.
+- **Type `!array`**: Sends a multidimensional NumPy array.
+
+Inside the interactive terminal of the **Runner**:
+- **`!c <text>`**: Send a string msg explicitly to the Client.
+- **`!s <text>`**: Send a string msg explicitly to the Server.
+- **`!b <text>`**: Broadcast a string msg to Both.
+- **`!array`**: Broadcast a multidimensional NumPy array to Both.
 
 ## Architecture
 

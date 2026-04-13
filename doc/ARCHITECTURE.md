@@ -57,10 +57,15 @@ The `Connection` handles:
 
 ## 3. The Proxy (`runner.py`)
 
-A runner acts as a Transparent Proxy. Because of the `Connection` architecture scaling, the runner is remarkably simple:
+A runner acts as a dynamic man-in-the-middle. Because of the `Connection` architecture scaling, the runner is remarkably versatile and supports execution arguments:
+
+### `--mode proxy` (Default Transparent Proxy)
 1. Accepts an incoming raw socket payload (acts as a Server).
 2. Connects cleanly to another downstream destination (acts as a Client).
-3. Assigns `client_conn.on_message` to execute `server_conn.send(msg)`.
-4. Assigns `server_conn.on_message` to execute `client_conn.send(msg)`.
+3. Re-routes `client_conn.on_message` to automatically execute `server_conn.send(msg)`.
+4. Re-routes `server_conn.on_message` to automatically execute `client_conn.send(msg)`.
 
 Message metadata (`msg.length`, `msg.type`) is intercepted and logged without changing the packet, enabling real-time monitoring of TCP traffic behavior without terminating the payload.
+
+### `--mode isolate` (Interception node)
+Instead of blindly forwarding packets, isolate mode consumes the packet. The `on_message` trigger fires but is entirely siloed, requiring the developer/user to invoke terminal commands (`!c`, `!s`, `!b`) to physically inject new packets into the stream on demand.

@@ -10,12 +10,13 @@ Usage:
 import socket
 import argparse
 import time
+import numpy as np
 
 from core.message import Message
 from core.connection import Connection
 
 
-def start_runner(listen_host: str, listen_port: int, target_host: str, target_port: int) -> None:
+def start_runner(listen_host: str, listen_port: int, target_host: str, target_port: int, mode: str) -> None:
     # 1. Listen for client (act as server)
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -57,14 +58,22 @@ def start_runner(listen_host: str, listen_port: int, target_host: str, target_po
     client_conn = Connection(client_sock)
     server_conn = Connection(target_socket)
 
-    # Handlers for forwarding data
+    # Handlers for data
     def on_client_msg(c: Connection, msg: Message):
-        print(f"[CLIENT -> SERVER] Forwarding message of length {msg.length}")
-        server_conn.send(msg)
+        if mode == "proxy":
+            print(f"\n[CLIENT -> SERVER] Forwarding message of length {msg.length}")
+            server_conn.send(msg)
+        else:
+            print(f"\n[CLIENT] Intercepted message (isolate mode): length {msg.length}")
+        print("You (runner) > ", end="", flush=True)
 
     def on_server_msg(c: Connection, msg: Message):
-        print(f"[SERVER -> CLIENT] Forwarding message of length {msg.length}")
-        client_conn.send(msg)
+        if mode == "proxy":
+            print(f"\n[SERVER -> CLIENT] Forwarding message of length {msg.length}")
+            client_conn.send(msg)
+        else:
+            print(f"\n[SERVER] Intercepted message (isolate mode): length {msg.length}")
+        print("You (runner) > ", end="", flush=True)
 
     def on_disconnect(c: Connection):
         print("\n[INFO] A connection dropped. Tearing down proxy...")
@@ -79,15 +88,42 @@ def start_runner(listen_host: str, listen_port: int, target_host: str, target_po
     server_conn.on_message = on_server_msg
     server_conn.on_disconnect = on_disconnect
 
+    print("Runner is proxying messages. You can also inject messages:")
+    print("  !c <text>    -> send to Client")
+    print("  !s <text>    -> send to Server")
+    print("  !b <text>    -> send to Both")
+    print("  !array       -> send numpy array to Both")
+    print("Press Ctrl+C to quit.\n")
+
     # Start listening to both
     client_conn.start()
     server_conn.start()
 
     try:
-        # Keep main thread alive
         while client_conn.is_connected and server_conn.is_connected:
-            time.sleep(0.5)
-    except KeyboardInterrupt:
+            text = input("You (runner) > ")
+            if not text or not client_conn.is_connected or not server_conn.is_connected:
+                continue
+
+            if text.startswith("!c "):
+                msg = Message.from_string(text[3:])
+                client_conn.send(msg)
+            elif text.startswith("!s "):
+                msg = Message.from_string(text[3:])
+                server_conn.send(msg)
+            elif text.startswith("!b "):
+                msg = Message.from_string(text[3:])
+                client_conn.send(msg)
+                server_conn.send(msg)
+            elif text.strip() == "!array":
+                arr = np.array([[9, 9], [9, 9]], dtype=np.int32)
+                msg = Message.from_ndarray(arr)
+                client_conn.send(msg)
+                server_conn.send(msg)
+                print(f"[RUNNER] Injected array {arr.shape} dtype={arr.dtype} to both.")
+            else:
+                print("Unknown command. Use: !c <msg>, !s <msg>, !b <msg>, or !array")
+    except (KeyboardInterrupt, EOFError):
         print("\n[RUNNER] Shutting down …")
     finally:
         client_conn.close()
@@ -101,6 +137,8 @@ if __name__ == "__main__":
     parser.add_argument("--listen-port", type=int, default=8000, help="Port to listen on")
     parser.add_argument("--target-host", default="127.0.0.1", help="Target server host")
     parser.add_argument("--target-port", type=int, default=9000, help="Target server port")
+    parser.add_argument("--mode", choices=["proxy", "isolate"], default="proxy", 
+                        help="proxy: actively forward messages. isolate: receive without forwarding.")
     args = parser.parse_args()
 
-    start_runner(args.listen_host, args.listen_port, args.target_host, args.target_port)
+    start_runner(args.listen_host, args.listen_port, args.target_host, args.target_port, args.mode)
