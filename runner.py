@@ -17,7 +17,9 @@ from core.connection import Connection
 
 
 def start_runner(listen_host: str, listen_port: int, target_host: str, target_port: int, mode: str) -> None:
-    # 1. Listen for client (act as server)
+    import threading
+
+    # 1. Listen for incoming loop connection
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
@@ -28,31 +30,39 @@ def start_runner(listen_host: str, listen_port: int, target_host: str, target_po
         print(f"[ERROR] Could not bind to {listen_host}:{listen_port}: {e}")
         return
 
-    print(f"[RUNNER] Listening for client on {listen_host}:{listen_port} …")
-    
-    try:
-        client_sock, client_addr = server_socket.accept()
-    except KeyboardInterrupt:
-        print("\n[RUNNER] Shutting down …")
-        server_socket.close()
-        return
-        
-    print(f"[RUNNER] Client connected from {client_addr}\n")
-    
-    # 2. Connect to target server (act as client)
-    target_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print(f"[RUNNER] Connecting to target server at {target_host}:{target_port} …")
-    
-    try:
-        target_socket.connect((target_host, target_port))
-    except ConnectionRefusedError:
-        print(f"[ERROR] Could not connect to target server — is it running on {target_port}?")
-        client_sock.close()
-        server_socket.close()
-        return
+    # Accept incoming connection concurrently to avoid cyclic deadlock
+    accepted = []
+    def do_accept():
+        try:
+            conn, addr = server_socket.accept()
+            accepted.append(conn)
+        except:
+            pass
+            
+    accept_thread = threading.Thread(target=do_accept, daemon=True)
+    accept_thread.start()
 
-    print(f"[RUNNER] Connected to target server.\n")
-    print("Runner is now proxying messages. Press Ctrl+C to stop.\n")
+    # 2. Continually try to connect to the next node in the ring
+    target_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    print(f"[RUNNER] Listening on {listen_port}. Dialing downstream node at {target_port}...")
+    
+    while True:
+        try:
+            target_socket.connect((target_host, target_port))
+            print(f"[RUNNER] Connected downstream successfully to {target_port}!")
+            break
+        except ConnectionRefusedError:
+            time.sleep(1)
+        except KeyboardInterrupt:
+            server_socket.close()
+            return
+            
+    print(f"[RUNNER] Waiting for upstream node to form loop on {listen_port}...")
+    while not accepted:
+        time.sleep(0.5)
+        
+    client_sock = accepted[0]
+    print("[RUNNER] Network Loop Node fully established!\n")
 
     # 3. Setup proxy connections using our new abstraction
     client_conn = Connection(client_sock)
@@ -64,7 +74,7 @@ def start_runner(listen_host: str, listen_port: int, target_host: str, target_po
             print(f"\n[CLIENT -> SERVER] Forwarding message of length {msg.length}")
             server_conn.send(msg)
         else:
-            print(f"\n[CLIENT] Intercepted message (isolate mode): length {msg.length}")
+            print(f"\n[CLIENT] Intercepted message: {msg.data}")
         print("You (runner) > ", end="", flush=True)
 
     def on_server_msg(c: Connection, msg: Message):
@@ -72,7 +82,7 @@ def start_runner(listen_host: str, listen_port: int, target_host: str, target_po
             print(f"\n[SERVER -> CLIENT] Forwarding message of length {msg.length}")
             client_conn.send(msg)
         else:
-            print(f"\n[SERVER] Intercepted message (isolate mode): length {msg.length}")
+            print(f"\n[SERVER] Intercepted message: {msg.data}")
         print("You (runner) > ", end="", flush=True)
 
     def on_disconnect(c: Connection):
