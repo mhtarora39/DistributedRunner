@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DistributedRunner — Architecture Graph</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface-2: #1a1a26;
+      --border: #2a2a3a;
+      --text: #e4e4ef;
+      --text-muted: #8888a0;
+      --accent: #6c5ce7;
+      --accent-glow: rgba(108, 92, 231, 0.35);
+      --green: #00cec9;
+      --orange: #e17055;
+      --pink: #fd79a8;
+      --yellow: #ffeaa7;
+      --cyan: #74b9ff;
+      --teal: #55efc4;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ── Top Bar ─────────────────────── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .topbar-logo {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--pink));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: #fff;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .topbar-title {
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.3px;
+    }
+
+    .topbar-title span {
+      color: var(--text-muted);
+      font-weight: 400;
+      margin-left: 6px;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 3px;
+    }
+
+    /* ── Controls Panel ──────────────── */
+    .controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      z-index: 100;
+      padding: 8px 12px;
+      background: rgba(18, 18, 26, 0.9);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    .ctrl-btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 7px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .ctrl-btn:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    .ctrl-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* ── Tooltip ──────────────────────── */
+    .tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(18, 18, 26, 0.96);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      max-width: 360px;
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      z-index: 200;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .tooltip.visible { opacity: 1; }
+    .tooltip-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+    .tooltip-type {
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+    .tooltip-desc {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    /* ── Side Panel ────────────────────── */
+    .sidepanel {
+      position: fixed;
+      top: 56px;
+      right: -420px;
+      width: 400px;
+      bottom: 0;
+      background: rgba(12, 12, 18, 0.95);
+      backdrop-filter: blur(24px);
+      border-left: 1px solid var(--border);
+      z-index: 90;
+      transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    .sidepanel.open { right: 0; }
+
+    .sidepanel-close {
+      position: absolute;
+      top: 16px; right: 16px;
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .sidepanel-close:hover {
+      background: var(--orange);
+      color: #fff;
+      border-color: var(--orange);
+    }
+
+    .sp-module-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .sp-module-type {
+      font-size: 12px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+    }
+
+    .sp-section {
+      margin-bottom: 18px;
+    }
+
+    .sp-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .sp-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    .sp-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: var(--green);
+      white-space: pre-wrap;
+      line-height: 1.6;
+      overflow-x: auto;
+    }
+
+    .sp-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      margin: 2px 4px 2px 0;
+    }
+
+    .sp-connections {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sp-conn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 6px 10px;
+      background: var(--surface-2);
+      border-radius: 6px;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .sp-conn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .sp-conn-arrow {
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── SVG Canvas ───────────────────── */
+    svg {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    /* Grid overlay */
+    .grid-pattern {
+      opacity: 0.04;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">DR</div>
+    <div class="topbar-title">DistributedRunner <span>Architecture Graph</span></div>
+  </div>
+  <div class="topbar-right">
+    <div class="legend-item"><div class="legend-dot" style="background:#6c5ce7"></div> Core Library</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#00cec9"></div> Endpoint Nodes</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#e17055"></div> Proxy / Ring</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ffeaa7"></div> Class</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fd79a8"></div> Function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#74b9ff"></div> Protocol</div>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-label" id="tt-label"></div>
+  <div class="tooltip-type" id="tt-type"></div>
+  <div class="tooltip-desc" id="tt-desc"></div>
+</div>
+
+<!-- Side Panel -->
+<div class="sidepanel" id="sidepanel">
+  <button class="sidepanel-close" id="sp-close">✕</button>
+  <div id="sp-content"></div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="ctrl-btn active" data-filter="all">All</button>
+  <button class="ctrl-btn" data-filter="modules">Modules</button>
+  <button class="ctrl-btn" data-filter="classes">Classes</button>
+  <button class="ctrl-btn" data-filter="dataflow">Data Flow</button>
+  <button class="ctrl-btn" id="btn-reset">Reset View</button>
+</div>
+
+<!-- SVG Canvas -->
+<svg id="graph"></svg>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────
+// DATA MODEL
+// ─────────────────────────────────────────────────────────────────
+
+const nodes = [
+  // Core libraries
+  { id: "core.message", label: "message.py", group: "core", type: "module", r: 32,
+    desc: "Wire-serialization protocol defining Type-Tagged, Length-Prefixed framing for TCP transmission. Supports strings, NumPy arrays, and JSON control messages.",
+    details: {
+      key_elements: ["Message (dataclass)", "TAG_STRING (0x01)", "TAG_NDARRAY (0x02)", "TAG_CONTROL (0x03)"],
+      signature: "Wire: [1B tag][4B len][payload]",
+      deps: ["struct", "socket", "json", "numpy"]
+    }
+  },
+  { id: "core.connection", label: "connection.py", group: "core", type: "module", r: 30,
+    desc: "Thread-safe socket wrapper with daemon background receive loop and event-driven on_message / on_disconnect callbacks.",
+    details: {
+      key_elements: ["Connection (class)", "on_message callback", "on_disconnect callback", "_receive_loop (daemon)"],
+      signature: "Connection(sock) → .start() → .send(msg) → .close()",
+      deps: ["socket", "threading", "core.message"]
+    }
+  },
+
+  // Classes
+  { id: "class.Message", label: "Message", group: "class", type: "class", r: 26,
+    desc: "Dataclass wrapping typed payloads. Factory methods: from_string(), from_ndarray(), from_control(). Serializes via to_bytes() and deserializes via from_socket().",
+    details: {
+      key_elements: ["data: Union[str, np.ndarray, dict]", "length: int", "_cached_payload: bytes"],
+      signature: "from_string(text) | from_ndarray(arr) | from_control(dict)",
+      deps: []
+    }
+  },
+  { id: "class.Connection", label: "Connection", group: "class", type: "class", r: 26,
+    desc: "Wraps a raw socket with threading.Lock() guarded state, spawns a daemon _receive_loop, and dispatches to user-provided callbacks.",
+    details: {
+      key_elements: ["sock: socket", "is_connected: bool", "_lock: threading.Lock", "_recv_thread: Thread"],
+      signature: "__init__(sock) → start() → send(msg) → close()",
+      deps: []
+    }
+  },
+
+  // Wire protocol concepts
+  { id: "proto.frame", label: "Wire Frame", group: "protocol", type: "protocol", r: 22,
+    desc: "Length-prefixed framing protocol: [1-byte type tag] + [4-byte big-endian uint32 length] + [N-byte payload]. Prevents TCP stream boundary corruption.",
+    details: {
+      key_elements: ["TAG_STRING=0x01", "TAG_NDARRAY=0x02", "TAG_CONTROL=0x03", "Network Byte Order (!BI)"],
+      signature: "struct.pack('!BI', tag, len(payload)) + payload",
+      deps: []
+    }
+  },
+  { id: "proto.ndarray_enc", label: "NDArray Codec", group: "protocol", type: "protocol", r: 20,
+    desc: "Sub-frame encoding for NumPy arrays: [2B dtype_len][dtype_str][2B shape_len][shape_str][raw_bytes]. Preserves dtype and shape metadata.",
+    details: {
+      key_elements: ["_encode_ndarray()", "_decode_ndarray()", "dtype string serialization", "shape CSV encoding"],
+      signature: "[H dtype_len][dtype][H shape_len][shape][raw]",
+      deps: []
+    }
+  },
+
+  // Endpoint nodes
+  { id: "nodes.server", label: "server.py", group: "endpoint", type: "module", r: 28,
+    desc: "Interactive TCP server. Binds to a port, accepts one client, and enters an interactive send/receive loop supporting text and NumPy arrays.",
+    details: {
+      key_elements: ["start_server(host, port)", "on_message callback", "on_disconnect handler", "!array command"],
+      signature: "python nodes/server.py --port 9000",
+      deps: ["core.message", "core.connection", "numpy"]
+    }
+  },
+  { id: "nodes.client", label: "client.py", group: "endpoint", type: "module", r: 28,
+    desc: "Interactive TCP client. Connects to a server and provides a terminal interface for exchanging text messages and NumPy arrays.",
+    details: {
+      key_elements: ["start_client(host, port)", "on_message callback", "on_disconnect handler", "!array command"],
+      signature: "python nodes/client.py --port 9000",
+      deps: ["core.message", "core.connection", "numpy"]
+    }
+  },
+
+  // Proxy / Ring
+  { id: "runner", label: "runner.py", group: "proxy", type: "module", r: 32,
+    desc: "TCP proxy / man-in-the-middle. Accepts client connections and forwards to a downstream server. Supports 'proxy' (transparent) and 'isolate' (intercept) modes.",
+    details: {
+      key_elements: ["start_runner()", "proxy mode", "isolate mode", "!c / !s / !b / !array commands"],
+      signature: "python runner.py --listen-port 8000 --target-port 9000 --mode proxy",
+      deps: ["core.message", "core.connection", "numpy", "threading"]
+    }
+  },
+  { id: "node", label: "node.py", group: "proxy", type: "module", r: 34,
+    desc: "Cyclic Ring Node for distributed benchmarking. Forms a closed-loop topology using upstream/downstream connections. Node 0 is the orchestrator running RTT benchmarks with integrity checks.",
+    details: {
+      key_elements: ["start_node()", "upstream_conn / downstream_conn", "response_queue (Queue)", "p50/p95/p99 RTT stats"],
+      signature: "python node.py --rank 0 --world-size 4 --base-port 10000 --validate",
+      deps: ["core.message", "core.connection", "numpy", "threading", "queue", "hashlib"]
+    }
+  },
+
+  // Key functions
+  { id: "fn._recv_exact", label: "_recv_exact()", group: "function", type: "function", r: 18,
+    desc: "Blocking socket reader that consumes exactly N bytes via a bytearray loop. Handles TCP stream tearing and partial reads.",
+    details: { key_elements: [], signature: "_recv_exact(sock, num_bytes) → bytes | None", deps: [] }
+  },
+  { id: "fn._encode_ndarray", label: "_encode_ndarray()", group: "function", type: "function", r: 18,
+    desc: "Serializes a NumPy array into a byte frame with dtype and shape headers followed by raw buffer data.",
+    details: { key_elements: [], signature: "_encode_ndarray(array) → bytes", deps: [] }
+  },
+  { id: "fn._decode_ndarray", label: "_decode_ndarray()", group: "function", type: "function", r: 18,
+    desc: "Reconstructs a NumPy array from raw bytes using offset-based parsing of dtype, shape, and buffer data. Enforces .copy() for write safety.",
+    details: { key_elements: [], signature: "_decode_ndarray(payload) → np.ndarray", deps: [] }
+  },
+  { id: "fn.start_runner", label: "start_runner()", group: "function", type: "function", r: 18,
+    desc: "Main entry point for the proxy. Binds a listening port, dials downstream, sets up bidirectional callbacks, and starts interactive command loop.",
+    details: { key_elements: [], signature: "start_runner(listen_host, listen_port, target_host, target_port, mode)", deps: [] }
+  },
+  { id: "fn.start_node", label: "start_node()", group: "function", type: "function", r: 18,
+    desc: "Main entry for ring nodes. Binds locally, connects downstream, waits for upstream, and if rank==0, runs the benchmark loop.",
+    details: { key_elements: [], signature: "start_node(rank, world_size, base_port, validate)", deps: [] }
+  },
+];
+
+const links = [
+  // Module imports
+  { source: "nodes.server",   target: "core.message",    type: "import",   label: "imports" },
+  { source: "nodes.server",   target: "core.connection",  type: "import",   label: "imports" },
+  { source: "nodes.client",   target: "core.message",    type: "import",   label: "imports" },
+  { source: "nodes.client",   target: "core.connection",  type: "import",   label: "imports" },
+  { source: "runner",         target: "core.message",    type: "import",   label: "imports" },
+  { source: "runner",         target: "core.connection",  type: "import",   label: "imports" },
+  { source: "node",           target: "core.message",    type: "import",   label: "imports" },
+  { source: "node",           target: "core.connection",  type: "import",   label: "imports" },
+  { source: "core.connection", target: "core.message",   type: "import",   label: "imports Message" },
+
+  // Class containment
+  { source: "core.message",    target: "class.Message",    type: "contains", label: "defines" },
+  { source: "core.connection", target: "class.Connection",  type: "contains", label: "defines" },
+
+  // Function containment
+  { source: "core.message",    target: "fn._recv_exact",     type: "contains", label: "defines" },
+  { source: "core.message",    target: "fn._encode_ndarray", type: "contains", label: "defines" },
+  { source: "core.message",    target: "fn._decode_ndarray", type: "contains", label: "defines" },
+  { source: "runner",          target: "fn.start_runner",    type: "contains", label: "defines" },
+  { source: "node",            target: "fn.start_node",      type: "contains", label: "defines" },
+
+  // Protocol
+  { source: "class.Message",   target: "proto.frame",       type: "implements", label: "produces" },
+  { source: "proto.frame",     target: "proto.ndarray_enc", type: "extends",    label: "sub-frame" },
+  { source: "fn._encode_ndarray", target: "proto.ndarray_enc", type: "implements", label: "encodes" },
+  { source: "fn._decode_ndarray", target: "proto.ndarray_enc", type: "implements", label: "decodes" },
+  { source: "fn._recv_exact",  target: "proto.frame",       type: "implements", label: "reads" },
+
+  // Data flow
+  { source: "nodes.client",   target: "runner",           type: "dataflow", label: "TCP bytes" },
+  { source: "runner",         target: "nodes.server",     type: "dataflow", label: "TCP forward" },
+  { source: "nodes.server",   target: "runner",           type: "dataflow", label: "TCP bytes" },
+  { source: "runner",         target: "nodes.client",     type: "dataflow", label: "TCP forward" },
+
+  // Class usage
+  { source: "class.Connection", target: "class.Message",   type: "uses",     label: "sends/receives" },
+
+  // Ring topology
+  { source: "node",            target: "node",            type: "ring",     label: "ring loop" },
+];
+
+// ─────────────────────────────────────────────────────────────────
+// COLOR SYSTEM
+// ─────────────────────────────────────────────────────────────────
+
+const groupColors = {
+  core:     "#6c5ce7",
+  endpoint: "#00cec9",
+  proxy:    "#e17055",
+  class:    "#ffeaa7",
+  function: "#fd79a8",
+  protocol: "#74b9ff",
+};
+
+const linkColors = {
+  import:     "#6c5ce744",
+  contains:   "#ffffff18",
+  implements: "#74b9ff44",
+  extends:    "#74b9ff33",
+  dataflow:   "#00cec966",
+  uses:       "#ffeaa733",
+  ring:       "#e1705566",
+};
+
+const linkActiveColors = {
+  import:     "#6c5ce7",
+  contains:   "#ffffff55",
+  implements: "#74b9ff",
+  extends:    "#74b9ff99",
+  dataflow:   "#00cec9",
+  uses:       "#ffeaa7",
+  ring:       "#e17055",
+};
+
+// ─────────────────────────────────────────────────────────────────
+// SVG SETUP
+// ─────────────────────────────────────────────────────────────────
+
+const width = window.innerWidth;
+const height = window.innerHeight;
+const svg = d3.select("#graph")
+  .attr("viewBox", [0, 0, width, height]);
+
+// Defs
+const defs = svg.append("defs");
+
+// Glow filter
+const glow = defs.append("filter").attr("id", "glow");
+glow.append("feGaussianBlur").attr("stdDeviation", "4").attr("result", "blur");
+glow.append("feMerge").selectAll("feMergeNode")
+  .data(["blur", "SourceGraphic"])
+  .join("feMergeNode").attr("in", d => d);
+
+// Radial gradients per group
+Object.entries(groupColors).forEach(([group, color]) => {
+  const grad = defs.append("radialGradient")
+    .attr("id", `grad-${group}`)
+    .attr("cx", "35%").attr("cy", "35%");
+  grad.append("stop").attr("offset", "0%").attr("stop-color", d3.color(color).brighter(0.8));
+  grad.append("stop").attr("offset", "100%").attr("stop-color", color);
+});
+
+// Arrow markers
+Object.entries(linkActiveColors).forEach(([type, color]) => {
+  defs.append("marker")
+    .attr("id", `arrow-${type}`)
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 20).attr("refY", 0)
+    .attr("markerWidth", 6).attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-4L8,0L0,4")
+    .attr("fill", color);
+});
+
+// Grid pattern
+const gridGroup = svg.append("g").attr("class", "grid-pattern");
+for (let x = 0; x < width; x += 40) {
+  gridGroup.append("line").attr("x1", x).attr("y1", 0).attr("x2", x).attr("y2", height).attr("stroke", "#fff").attr("stroke-width", 0.5);
+}
+for (let y = 0; y < height; y += 40) {
+  gridGroup.append("line").attr("x1", 0).attr("y1", y).attr("x2", width).attr("y2", y).attr("stroke", "#fff").attr("stroke-width", 0.5);
+}
+
+// Main container for zoom
+const container = svg.append("g");
+
+// ─────────────────────────────────────────────────────────────────
+// ZOOM
+// ─────────────────────────────────────────────────────────────────
+
+const zoom = d3.zoom()
+  .scaleExtent([0.3, 4])
+  .on("zoom", (e) => {
+    container.attr("transform", e.transform);
+  });
+
+svg.call(zoom);
+
+// ─────────────────────────────────────────────────────────────────
+// FORCE SIMULATION
+// ─────────────────────────────────────────────────────────────────
+
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(d => {
+    if (d.type === "contains") return 80;
+    if (d.type === "import") return 180;
+    if (d.type === "dataflow") return 220;
+    return 150;
+  }).strength(d => {
+    if (d.type === "contains") return 0.9;
+    if (d.type === "ring") return 0.05;
+    return 0.3;
+  }))
+  .force("charge", d3.forceManyBody().strength(d => d.type === "function" ? -300 : -600))
+  .force("center", d3.forceCenter(width / 2, height / 2))
+  .force("collision", d3.forceCollide().radius(d => d.r + 20))
+  .force("x", d3.forceX(width / 2).strength(0.04))
+  .force("y", d3.forceY(height / 2).strength(0.04));
+
+// ─────────────────────────────────────────────────────────────────
+// RENDER LINKS
+// ─────────────────────────────────────────────────────────────────
+
+const linkGroup = container.append("g");
+
+const linkElements = linkGroup.selectAll("line")
+  .data(links)
+  .join("line")
+  .attr("stroke", d => linkColors[d.type])
+  .attr("stroke-width", d => d.type === "dataflow" ? 2.5 : d.type === "contains" ? 1 : 1.5)
+  .attr("stroke-dasharray", d => d.type === "contains" ? "4,4" : d.type === "ring" ? "8,4" : "none")
+  .attr("marker-end", d => (d.type === "dataflow" || d.type === "import") ? `url(#arrow-${d.type})` : null);
+
+// ─────────────────────────────────────────────────────────────────
+// RENDER LINK LABELS
+// ─────────────────────────────────────────────────────────────────
+
+const linkLabelGroup = container.append("g");
+
+const linkLabels = linkLabelGroup.selectAll("text")
+  .data(links.filter(d => d.type === "dataflow" || d.type === "ring"))
+  .join("text")
+  .text(d => d.label)
+  .attr("font-family", "'JetBrains Mono', monospace")
+  .attr("font-size", 9)
+  .attr("fill", d => linkActiveColors[d.type])
+  .attr("text-anchor", "middle")
+  .attr("dy", -6)
+  .attr("opacity", 0.6);
+
+// ─────────────────────────────────────────────────────────────────
+// ANIMATED PARTICLES ON DATAFLOW EDGES
+// ─────────────────────────────────────────────────────────────────
+
+const particleGroup = container.append("g");
+const dataflowLinks = links.filter(l => l.type === "dataflow");
+
+const particles = [];
+dataflowLinks.forEach(l => {
+  for (let i = 0; i < 3; i++) {
+    particles.push({ link: l, offset: Math.random(), speed: 0.003 + Math.random() * 0.004 });
+  }
+});
+
+const particleElements = particleGroup.selectAll("circle")
+  .data(particles)
+  .join("circle")
+  .attr("r", 2.5)
+  .attr("fill", "#00cec9")
+  .attr("opacity", 0.8)
+  .style("filter", "url(#glow)");
+
+// ─────────────────────────────────────────────────────────────────
+// RENDER NODES
+// ─────────────────────────────────────────────────────────────────
+
+const nodeGroup = container.append("g");
+
+const nodeElements = nodeGroup.selectAll("g")
+  .data(nodes)
+  .join("g")
+  .attr("cursor", "pointer")
+  .call(d3.drag()
+    .on("start", dragStart)
+    .on("drag", dragging)
+    .on("end", dragEnd)
+  );
+
+// Outer glow ring
+nodeElements.append("circle")
+  .attr("r", d => d.r + 6)
+  .attr("fill", "none")
+  .attr("stroke", d => groupColors[d.group])
+  .attr("stroke-width", 1.5)
+  .attr("opacity", 0.15)
+  .attr("class", "glow-ring");
+
+// Main circle
+nodeElements.append("circle")
+  .attr("r", d => d.r)
+  .attr("fill", d => `url(#grad-${d.group})`)
+  .attr("stroke", d => groupColors[d.group])
+  .attr("stroke-width", 2)
+  .attr("opacity", 0.9)
+  .attr("class", "main-circle");
+
+// Icon text in circle
+nodeElements.append("text")
+  .text(d => {
+    if (d.type === "module") return "📦";
+    if (d.type === "class") return "🔷";
+    if (d.type === "function") return "ƒ";
+    if (d.type === "protocol") return "⚡";
+    return "•";
+  })
+  .attr("font-size", d => d.r * 0.6)
+  .attr("text-anchor", "middle")
+  .attr("dominant-baseline", "central")
+  .attr("fill", "#fff")
+  .attr("pointer-events", "none");
+
+// Labels below nodes
+nodeElements.append("text")
+  .text(d => d.label)
+  .attr("y", d => d.r + 18)
+  .attr("font-family", "'JetBrains Mono', monospace")
+  .attr("font-size", d => d.type === "function" ? 10 : 11)
+  .attr("font-weight", 500)
+  .attr("fill", d => groupColors[d.group])
+  .attr("text-anchor", "middle")
+  .attr("pointer-events", "none")
+  .attr("opacity", 0.9);
+
+// ─────────────────────────────────────────────────────────────────
+// INTERACTIVITY
+// ─────────────────────────────────────────────────────────────────
+
+const tooltip = document.getElementById("tooltip");
+const ttLabel = document.getElementById("tt-label");
+const ttType = document.getElementById("tt-type");
+const ttDesc = document.getElementById("tt-desc");
+
+nodeElements.on("mouseenter", function(event, d) {
+  ttLabel.textContent = d.label;
+  ttType.textContent = d.type + " · " + d.group;
+  ttDesc.textContent = d.desc;
+  tooltip.classList.add("visible");
+
+  // Highlight connected
+  const connectedIds = new Set();
+  connectedIds.add(d.id);
+  links.forEach(l => {
+    const src = typeof l.source === "object" ? l.source.id : l.source;
+    const tgt = typeof l.target === "object" ? l.target.id : l.target;
+    if (src === d.id) connectedIds.add(tgt);
+    if (tgt === d.id) connectedIds.add(src);
+  });
+
+  nodeElements.transition().duration(200)
+    .attr("opacity", n => connectedIds.has(n.id) ? 1 : 0.15);
+  linkElements.transition().duration(200)
+    .attr("stroke", l => {
+      const src = typeof l.source === "object" ? l.source.id : l.source;
+      const tgt = typeof l.target === "object" ? l.target.id : l.target;
+      if (src === d.id || tgt === d.id) return linkActiveColors[l.type];
+      return linkColors[l.type];
+    })
+    .attr("opacity", l => {
+      const src = typeof l.source === "object" ? l.source.id : l.source;
+      const tgt = typeof l.target === "object" ? l.target.id : l.target;
+      return (src === d.id || tgt === d.id) ? 1 : 0.1;
+    });
+
+  d3.select(this).select(".glow-ring").transition().duration(200).attr("opacity", 0.5);
+  d3.select(this).select(".main-circle").transition().duration(200).attr("stroke-width", 3);
+});
+
+nodeElements.on("mousemove", (event) => {
+  tooltip.style.left = (event.clientX + 16) + "px";
+  tooltip.style.top = (event.clientY - 10) + "px";
+});
+
+nodeElements.on("mouseleave", function() {
+  tooltip.classList.remove("visible");
+  nodeElements.transition().duration(300).attr("opacity", 1);
+  linkElements.transition().duration(300)
+    .attr("stroke", d => linkColors[d.type])
+    .attr("opacity", 1);
+  d3.select(this).select(".glow-ring").transition().duration(300).attr("opacity", 0.15);
+  d3.select(this).select(".main-circle").transition().duration(300).attr("stroke-width", 2);
+});
+
+// Click → open side panel
+nodeElements.on("click", (event, d) => {
+  event.stopPropagation();
+  openSidePanel(d);
+});
+
+svg.on("click", () => closeSidePanel());
+
+// ─────────────────────────────────────────────────────────────────
+// SIDE PANEL
+// ─────────────────────────────────────────────────────────────────
+
+const sidepanel = document.getElementById("sidepanel");
+const spContent = document.getElementById("sp-content");
+document.getElementById("sp-close").addEventListener("click", closeSidePanel);
+
+function openSidePanel(d) {
+  const incoming = links.filter(l => (typeof l.target === "object" ? l.target.id : l.target) === d.id);
+  const outgoing = links.filter(l => (typeof l.source === "object" ? l.source.id : l.source) === d.id);
+
+  let connectionsHTML = "";
+  outgoing.forEach(l => {
+    const tgt = typeof l.target === "object" ? l.target : nodes.find(n => n.id === l.target);
+    connectionsHTML += `<div class="sp-conn"><span class="sp-conn-arrow">→</span> <b>${l.label}</b> ${tgt.label || tgt.id}</div>`;
+  });
+  incoming.forEach(l => {
+    const src = typeof l.source === "object" ? l.source : nodes.find(n => n.id === l.source);
+    connectionsHTML += `<div class="sp-conn"><span class="sp-conn-arrow">←</span> <b>${l.label}</b> ${src.label || src.id}</div>`;
+  });
+
+  let elementsHTML = "";
+  if (d.details && d.details.key_elements && d.details.key_elements.length > 0) {
+    elementsHTML = d.details.key_elements.map(e =>
+      `<span class="sp-tag" style="background:${groupColors[d.group]}22; color:${groupColors[d.group]}; border:1px solid ${groupColors[d.group]}44">${e}</span>`
+    ).join("");
+  }
+
+  let depsHTML = "";
+  if (d.details && d.details.deps && d.details.deps.length > 0) {
+    depsHTML = d.details.deps.map(dep =>
+      `<span class="sp-tag" style="background:var(--surface-2); color:var(--text-muted); border:1px solid var(--border)">${dep}</span>`
+    ).join("");
+  }
+
+  spContent.innerHTML = `
+    <div class="sp-module-name">${d.label}</div>
+    <div class="sp-module-type">${d.type} · ${d.group}</div>
+
+    <div class="sp-section">
+      <div class="sp-section-title">Description</div>
+      <div class="sp-desc">${d.desc}</div>
+    </div>
+
+    ${d.details && d.details.signature ? `
+    <div class="sp-section">
+      <div class="sp-section-title">Signature</div>
+      <div class="sp-code">${d.details.signature}</div>
+    </div>
+    ` : ""}
+
+    ${elementsHTML ? `
+    <div class="sp-section">
+      <div class="sp-section-title">Key Elements</div>
+      <div>${elementsHTML}</div>
+    </div>
+    ` : ""}
+
+    ${depsHTML ? `
+    <div class="sp-section">
+      <div class="sp-section-title">Dependencies</div>
+      <div>${depsHTML}</div>
+    </div>
+    ` : ""}
+
+    <div class="sp-section">
+      <div class="sp-section-title">Connections (${incoming.length + outgoing.length})</div>
+      <div class="sp-connections">${connectionsHTML || "<div class='sp-desc'>None</div>"}</div>
+    </div>
+  `;
+
+  sidepanel.classList.add("open");
+}
+
+function closeSidePanel() {
+  sidepanel.classList.remove("open");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// FILTER CONTROLS
+// ─────────────────────────────────────────────────────────────────
+
+document.querySelectorAll(".ctrl-btn[data-filter]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".ctrl-btn[data-filter]").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    applyFilter(btn.dataset.filter);
+  });
+});
+
+function applyFilter(filter) {
+  if (filter === "all") {
+    nodeElements.transition().duration(400).attr("opacity", 1);
+    linkElements.transition().duration(400).attr("opacity", 1);
+    return;
+  }
+
+  let visibleGroups;
+  let visibleLinkTypes;
+  if (filter === "modules") {
+    visibleGroups = new Set(["core", "endpoint", "proxy"]);
+    visibleLinkTypes = new Set(["import", "dataflow", "ring"]);
+  } else if (filter === "classes") {
+    visibleGroups = new Set(["class", "function", "protocol", "core"]);
+    visibleLinkTypes = new Set(["contains", "implements", "extends", "uses"]);
+  } else if (filter === "dataflow") {
+    visibleGroups = new Set(["endpoint", "proxy", "core"]);
+    visibleLinkTypes = new Set(["dataflow", "ring"]);
+  }
+
+  const visibleIds = new Set(nodes.filter(n => visibleGroups.has(n.group)).map(n => n.id));
+
+  nodeElements.transition().duration(400)
+    .attr("opacity", d => visibleIds.has(d.id) ? 1 : 0.08);
+  linkElements.transition().duration(400)
+    .attr("opacity", d => visibleLinkTypes.has(d.type) ? 1 : 0.04);
+}
+
+// Reset
+document.getElementById("btn-reset").addEventListener("click", () => {
+  svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+  document.querySelectorAll(".ctrl-btn[data-filter]").forEach(b => b.classList.remove("active"));
+  document.querySelector("[data-filter='all']").classList.add("active");
+  applyFilter("all");
+  closeSidePanel();
+});
+
+// ─────────────────────────────────────────────────────────────────
+// DRAG
+// ─────────────────────────────────────────────────────────────────
+
+function dragStart(event, d) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragging(event, d) {
+  d.fx = event.x;
+  d.fy = event.y;
+}
+
+function dragEnd(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TICK
+// ─────────────────────────────────────────────────────────────────
+
+simulation.on("tick", () => {
+  linkElements
+    .attr("x1", d => d.source.x)
+    .attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x)
+    .attr("y2", d => d.target.y);
+
+  linkLabels
+    .attr("x", d => (d.source.x + d.target.x) / 2)
+    .attr("y", d => (d.source.y + d.target.y) / 2);
+
+  nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+
+  // Animate particles
+  particles.forEach(p => {
+    p.offset = (p.offset + p.speed) % 1;
+  });
+  particleElements
+    .attr("cx", d => {
+      const src = d.link.source;
+      const tgt = d.link.target;
+      return src.x + (tgt.x - src.x) * d.offset;
+    })
+    .attr("cy", d => {
+      const src = d.link.source;
+      const tgt = d.link.target;
+      return src.y + (tgt.y - src.y) * d.offset;
+    });
+});
+
+// Keep animating particles even after simulation cools
+d3.timer(() => {
+  particles.forEach(p => {
+    p.offset = (p.offset + p.speed) % 1;
+  });
+  particleElements
+    .attr("cx", d => {
+      const src = d.link.source;
+      const tgt = d.link.target;
+      return src.x + (tgt.x - src.x) * d.offset;
+    })
+    .attr("cy", d => {
+      const src = d.link.source;
+      const tgt = d.link.target;
+      return src.y + (tgt.y - src.y) * d.offset;
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────
+// INITIAL ANIMATION
+// ─────────────────────────────────────────────────────────────────
+
+nodeElements.attr("opacity", 0)
+  .transition().delay((d, i) => i * 80).duration(600)
+  .attr("opacity", 1);
+
+linkElements.attr("opacity", 0)
+  .transition().delay(600).duration(800)
+  .attr("opacity", 1);
+
+</script>
+</body>
+</html>
